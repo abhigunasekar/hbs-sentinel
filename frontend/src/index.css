@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans;
+    margin: 0;
+    padding: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
+
+@layer components {
+  .sentinel-card {
+    @apply bg-gray-900 border border-gray-800 rounded-xl;
+  }
+
+  .sentinel-btn-primary {
+    @apply bg-crimson-700 hover:bg-crimson-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
+  }
+
+  .sentinel-btn-secondary {
+    @apply bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium px-4 py-2 rounded-lg transition-colors duration-150 flex items-center gap-2;
+  }
+
+  .sentinel-badge-affected {
+    @apply bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+
+  .sentinel-badge-at-risk {
+    @apply bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+
+  .sentinel-badge-safe {
+    @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+
+  .sentinel-badge-unconfirmed {
+    @apply bg-gray-500/20 text-gray-400 border border-gray-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+
+  .pulse-red {
+    animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
+/* Leaflet dark map overrides */
+.leaflet-container {
+  background: #0f172a !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+  border-radius: 12px !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5) !important;
+}
+
+.leaflet-popup-tip {
+  background: #1e293b !important;
+}
+
+.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+
+.leaflet-control-zoom a {
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Animated crisis ring */
+@keyframes crisis-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.05); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+
+.crisis-zone-circle {
+  animation: crisis-pulse 3s ease-in-out infinite;
+}
+
+/* Pipeline progress animation */
+@keyframes slide-in {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+/* Alert banner animation */
+@keyframes alert-drop {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.alert-drop {
+  animation: alert-drop 0.4s ease-out forwards;
+}
