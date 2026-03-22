@@ -43,6 +43,18 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    year: str = "MBA 2026"
+    program: str = "MBA"
+    hometown: str = ""
+    phone: str = ""
+    current_city: str = ""
+    current_lat: float = 0.0
+    current_lng: float = 0.0
+
 class TriggerCrisisRequest(BaseModel):
     description: str
     source_headline: Optional[str] = None
@@ -84,6 +96,37 @@ async def login(req: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"success": True, "user": user}
+
+@app.post("/api/auth/register")
+async def register(req: RegisterRequest):
+    """Register a new student account."""
+    student = db.register_student(
+        name=req.name,
+        email=req.email,
+        password=req.password,
+        year=req.year,
+        program=req.program,
+        hometown=req.hometown,
+        phone=req.phone,
+        current_city=req.current_city,
+        current_lat=req.current_lat,
+        current_lng=req.current_lng,
+    )
+    if not student:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    # Broadcast new student to admins
+    await ws_manager.broadcast_to_admins("student_registered", {"student": student})
+    return {
+        "success": True,
+        "user": {
+            "id": student["id"],
+            "name": student["name"],
+            "email": student["email"],
+            "role": "student",
+            "year": student["year"],
+            "current_city": student["current_city"],
+        }
+    }
 
 # ─── Students ─────────────────────────────────────────────────────────────────
 

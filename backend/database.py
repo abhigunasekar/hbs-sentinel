@@ -175,6 +175,40 @@ class Database:
 
     # ── Reset ─────────────────────────────────────────────────────────────────
 
+    def register_student(self, name: str, email: str, password: str, year: str,
+                          program: str, hometown: str, phone: str,
+                          current_city: str, current_lat: float, current_lng: float) -> dict:
+        """Register a new student account and return the user dict."""
+        from models import Student, RiskStatus
+        import uuid as _uuid
+        # Check email not already taken
+        if email == self.admin.email:
+            return None
+        for s in self.students.values():
+            if s.email == email:
+                return None
+        new_id = f"s{str(len(self.students) + 1).zfill(3)}"
+        # Ensure unique ID
+        while new_id in self.students:
+            new_id = f"s{str(_uuid.uuid4())[:6]}"
+        student = Student(
+            id=new_id,
+            name=name,
+            email=email,
+            password=password,
+            year=year,
+            program=program,
+            hometown=hometown,
+            phone=phone,
+            current_city=current_city,
+            current_lat=current_lat,
+            current_lng=current_lng,
+            bio=f"{name} is an HBS {program} student from {hometown}, currently based in {current_city}.",
+            risk_status=RiskStatus.UNCONFIRMED,
+        )
+        self.students[new_id] = student
+        return self._student_to_dict(student)
+
     def reset_demo(self):
         """Reset all state for a fresh demo run."""
         self.students = {s.id: copy.deepcopy(s) for s in MOCK_STUDENTS}

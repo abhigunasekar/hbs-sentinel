@@ -15,6 +15,8 @@ import asyncio
 import math
 import uuid
 import logging
+import urllib.request
+import urllib.parse
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Tuple
 
@@ -238,42 +240,166 @@ INSTRUCTIONS:
     return message
 
 
+# ─── GDELT NEWS FETCHER ───────────────────────────────────────────────────────
+
+def _fetch_gdelt_articles(query: str, timespan: str = "72h", max_records: int = 20) -> List[dict]:
+    """
+    Fetch real news articles from the GDELT Project API.
+    Returns list of article dicts with url, title, seendate, sourcecountry, language.
+    Rate limit: 1 request per 5 seconds.
+    """
+    encoded_query = urllib.parse.quote(query)
+    url = (
+        f"https://api.gdeltproject.org/api/v2/doc/doc"
+        f"?query={encoded_query}"
+        f"&mode=artlist"
+        f"&maxrecords={max_records}"
+        f"&format=json"
+        f"&timespan={timespan}"
+        f"&sourcelang=english"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "HBS-Sentinel/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8")
+        if not raw.strip().startswith("{"):
+            logger.warning(f"GDELT non-JSON response: {raw[:100]}")
+            return []
+        data = json.loads(raw)
+        articles = data.get("articles", [])
+        # Filter to English only
+        english = [a for a in articles if a.get("language", "").lower() == "english"]
+        logger.info(f"GDELT fetched {len(english)} English articles for query: {query[:50]}")
+        return english
+    except Exception as e:
+        logger.error(f"GDELT fetch error: {e}")
+        return []
+
+
 # ─── NEWS MONITOR ─────────────────────────────────────────────────────────────
 
 async def monitor_news_for_crises() -> List[dict]:
     """
-    Uses AI to scan for crisis events relevant to HBS student locations.
-    In production with real Claude: uses web_search tool for live news.
-    In this environment: uses AI reasoning about known global risk patterns.
+    Fetches REAL live news from GDELT, then uses AI to classify each article
+    for crisis relevance, severity, and geographic location.
     """
     student_locations = [
         "Bangkok Thailand", "London UK", "São Paulo Brazil",
         "Berlin Germany", "Dubai UAE", "Paris France", "Seoul South Korea"
     ]
+
+    # Fetch real articles from GDELT
+    loop = asyncio.get_event_loop()
+    gdelt_articles = await loop.run_in_executor(
+        None,
+        lambda: _fetch_gdelt_articles(
+            "(hurricane OR typhoon OR earthquake OR flood OR wildfire OR tsunami OR disaster OR explosion OR attack OR civil unrest OR evacuation OR emergency)",
+            timespan="72h",
+            max_records=25,
+        )
+    )
+
+    if not gdelt_articles:
+        logger.warning("GDELT returned no articles — falling back to AI-generated intelligence")
+        # Fallback: AI-generated items if GDELT is unavailable
+        return await _ai_fallback_news(student_locations)
+
+    # Prepare article summaries for Claude to classify
+    articles_text = "\n".join([
+        f"- [{a.get('sourcecountry', 'Unknown')}] {a.get('title', 'No title')} (seen: {a.get('seendate', '')})"
+        for a in gdelt_articles[:20]
+    ])
+
     locations_str = ", ".join(student_locations)
 
-    prompt = f"""You are the Crisis Monitor for HBS Sentinel, a student safety platform for Harvard Business School.
+    prompt = f"""You are the Crisis Monitor for HBS Sentinel, a student safety intelligence platform for Harvard Business School.
 
-Based on your knowledge of global safety patterns and recent events (up to your training cutoff), identify any potential safety concerns for international travelers in these locations where HBS students are currently based:
-{locations_str}
+The following are REAL news headlines fetched live from the GDELT global news database in the last 72 hours:
 
-Also consider any ongoing geopolitical tensions, natural disaster seasons, or civil unrest patterns that could affect these locations.
+{articles_text}
 
-For each relevant item, return it in this JSON format. Return ONLY a JSON array:
+HBS students are currently located in: {locations_str}
+
+For each headline that represents a genuine safety concern for international travelers or students, classify it. Focus on:
+- Natural disasters (hurricanes, typhoons, earthquakes, floods, wildfires)
+- Civil unrest, protests, or political violence
+- Terrorist attacks or security incidents
+- Infrastructure failures (dam collapses, power grid failures)
+- Public health emergencies
+
+Return ONLY a JSON array of the relevant items (skip irrelevant headlines):
 [
   {{
-    "headline": "Descriptive headline about the safety concern",
-    "source": "Type of source (e.g. 'Weather Service', 'State Department', 'Local News')",
+    "headline": "Exact or paraphrased headline",
+    "source": "GDELT / {source country}",
     "url": "",
     "severity_estimate": <1-10>,
     "location_mentioned": "City/Country",
     "is_crisis": <true if this warrants student safety attention>,
-    "crisis_type": "Typhoon/Hurricane/Earthquake/Terrorist Attack/Civil Unrest/Flood/Wildfire/Other or null"
+    "crisis_type": "Typhoon/Hurricane/Earthquake/Terrorist Attack/Civil Unrest/Flood/Wildfire/Other or null",
+    "data_source": "GDELT Live Feed"
   }}
 ]
 
-Generate 3-6 realistic, plausible safety intelligence items. Include a mix of severity levels.
-If generating items for Bangkok specifically, note the typhoon season risk in the Gulf of Thailand region."""
+Include 3-8 items. Only include items with genuine safety relevance. If a headline is clearly not safety-related, skip it."""
+
+    try:
+        raw = await loop.run_in_executor(None, lambda: _chat([
+            {"role": "system", "content": "You are a global safety intelligence analyst. Classify real news headlines for crisis relevance. Return valid JSON array only."},
+            {"role": "user", "content": prompt}
+        ], 2048))
+
+        results = _parse_json(raw)
+
+        # Attach real URLs from GDELT articles where possible
+        for item in results:
+            for article in gdelt_articles:
+                title_lower = article.get("title", "").lower()
+                headline_lower = item.get("headline", "").lower()
+                # Match on first 4 words
+                first_words = " ".join(headline_lower.split()[:4])
+                if first_words and first_words in title_lower:
+                    item["url"] = article.get("url", "")
+                    item["source"] = f"GDELT / {article.get('sourcecountry', 'Live Feed')}"
+                    break
+
+        logger.info(f"News monitor: {len(results)} crisis items classified from {len(gdelt_articles)} GDELT articles")
+        return results
+    except Exception as e:
+        logger.error(f"News monitor AI classification error: {e}")
+        return await _ai_fallback_news(student_locations)
+
+
+async def _ai_fallback_news(student_locations: List[str]) -> List[dict]:
+    """Fallback: AI-generated safety intelligence when GDELT is unavailable."""
+    locations_str = ", ".join(student_locations)
+    prompt = f"""You are the Crisis Monitor for HBS Sentinel. GDELT news feed is temporarily unavailable.
+
+Generate 3-5 realistic safety intelligence items for HBS students in: {locations_str}
+
+Return ONLY a JSON array:
+[
+  {{
+    "headline": "Descriptive headline",
+    "source": "AI Safety Intelligence (GDELT unavailable)",
+    "url": "",
+    "severity_estimate": <1-10>,
+    "location_mentioned": "City/Country",
+    "is_crisis": <true/false>,
+    "crisis_type": "type or null",
+    "data_source": "AI Fallback"
+  }}
+]"""
+    loop = asyncio.get_event_loop()
+    try:
+        raw = await loop.run_in_executor(None, lambda: _chat([
+            {"role": "system", "content": "You are a safety intelligence analyst. Return valid JSON array only."},
+            {"role": "user", "content": prompt}
+        ], 1024))
+        return _parse_json(raw)
+    except Exception as e:
+        logger.error(f"AI fallback news error: {e}")
+        return [] the typhoon season risk in the Gulf of Thailand region."""
 
     loop = asyncio.get_event_loop()
     try:

@@ -347,7 +347,15 @@ export function AdminDashboard({ user, onLogout }: Props) {
             {activeTab === 'news' && (
               <div className="h-full overflow-y-auto space-y-2 pr-1">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm text-gray-400">Live global news feed monitored by Claude</p>
+                  <div>
+                    <p className="text-sm text-gray-400">Live global news feed monitored by Claude</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 text-xs bg-blue-900/30 border border-blue-800/40 text-blue-400 rounded-full px-2 py-0.5">
+                        <Globe className="w-3 h-3" /> GDELT Live Feed
+                      </span>
+                      <span className="text-xs text-gray-600">· Real headlines, AI-classified</span>
+                    </div>
+                  </div>
                   <button
                     onClick={scanNews}
                     disabled={scanningNews}
@@ -657,6 +665,11 @@ function NewsRow({ item, onTrigger }: { item: NewsItem; onTrigger: () => void })
             <span className="text-xs text-gray-500">{item.source}</span>
             <span className="text-xs text-gray-600">·</span>
             <span className="text-xs text-gray-500">{item.location_mentioned}</span>
+            {(item as any).data_source === 'GDELT Live Feed' && (
+              <span className="text-xs bg-blue-900/30 text-blue-400 border border-blue-800/40 px-1.5 py-0.5 rounded font-medium">
+                GDELT
+              </span>
+            )}
             {item.is_crisis && (
               <span className="text-xs bg-amber-900/40 text-amber-400 border border-amber-800/50 px-2 py-0.5 rounded-full font-medium">
                 Crisis Flagged

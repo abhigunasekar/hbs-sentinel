@@ -16,6 +16,11 @@ export const api = {
   // Auth
   login: (email: string, password: string) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (data: {
+    name: string; email: string; password: string;
+    year?: string; program?: string; hometown?: string;
+    phone?: string; current_city?: string; current_lat?: number; current_lng?: number;
+  }) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
 
   // Students
   getStudents: () => request('/students'),

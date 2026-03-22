@@ -131,6 +131,57 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
       crisisLayerRef.current = circle
     }
 
+    // Add travel plan destination pins (secondary markers)
+    students.forEach(student => {
+      if (!student.travel_plans || student.travel_plans.length === 0) return
+      student.travel_plans.forEach((tp: any) => {
+        if (!tp.destination_lat || !tp.destination_lng) return
+        const travelIcon = L.divIcon({
+          html: `<div style="
+            position: relative;
+            width: 14px; height: 14px;
+          ">
+            <div style="
+              width: 100%; height: 100%;
+              background: #a855f7;
+              border: 2px solid white;
+              border-radius: 3px;
+              transform: rotate(45deg);
+              box-shadow: 0 0 6px #a855f788;
+            "></div>
+          </div>`,
+          className: '',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        })
+        const travelMarker = L.marker([tp.destination_lat, tp.destination_lng], { icon: travelIcon })
+          .addTo(map)
+          .bindPopup(`
+            <div style="min-width: 180px;">
+              <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                <div style="width:10px;height:10px;background:#a855f7;border-radius:2px;transform:rotate(45deg);"></div>
+                <strong style="color:#f1f5f9; font-size:13px;">Planned Travel</strong>
+              </div>
+              <div style="color:#c4b5fd; font-size:12px; font-weight:600; margin-bottom:4px;">✈️ ${tp.destination}</div>
+              <div style="color:#94a3b8; font-size:11px; margin-bottom:2px;">Student: ${student.name}</div>
+              <div style="color:#94a3b8; font-size:11px;">Departs: ${tp.departure_date}</div>
+              <div style="color:#94a3b8; font-size:11px;">Returns: ${tp.return_date}</div>
+              <div style="color:#94a3b8; font-size:11px; margin-top:4px; font-style:italic;">${tp.purpose}</div>
+            </div>
+          `)
+        markersRef.current.push(travelMarker)
+
+        // Draw a dashed line from current location to travel destination
+        if (student.current_lat && student.current_lng) {
+          const line = L.polyline(
+            [[student.current_lat, student.current_lng], [tp.destination_lat, tp.destination_lng]],
+            { color: '#a855f7', weight: 1.5, dashArray: '4, 6', opacity: 0.5 }
+          ).addTo(map)
+          markersRef.current.push(line)
+        }
+      })
+    })
+
     // Add student markers
     students.forEach(student => {
       const color = STATUS_COLORS[student.risk_status] || '#6b7280'
@@ -216,6 +267,12 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
             <div className="flex items-center gap-2 pt-1 border-t border-gray-700 mt-1">
               <div className="w-3 h-3 rounded-full border-2 border-red-500 border-dashed" />
               <span className="text-xs text-gray-300">Crisis Zone</span>
+            </div>
+          )}
+          {students.some(s => s.travel_plans && s.travel_plans.length > 0) && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-700 mt-1">
+              <div className="w-3 h-3 border border-white/30 rotate-45" style={{ background: '#a855f7' }} />
+              <span className="text-xs text-gray-300">Planned Travel</span>
             </div>
           )}
         </div>
