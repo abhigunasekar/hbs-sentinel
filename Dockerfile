@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Cache bust: 2026-03-22-v3
+ARG CACHEBUST=3
+
 WORKDIR /app
 
 # Install dependencies
