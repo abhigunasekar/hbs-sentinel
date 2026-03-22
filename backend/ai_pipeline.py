@@ -331,7 +331,7 @@ Return ONLY a JSON array of the relevant items (skip irrelevant headlines):
 [
   {{
     "headline": "Exact or paraphrased headline",
-    "source": "GDELT / {source country}",
+    "source": "GDELT / [source country]",
     "url": "",
     "severity_estimate": <1-10>,
     "location_mentioned": "City/Country",
@@ -399,20 +399,6 @@ Return ONLY a JSON array:
         return _parse_json(raw)
     except Exception as e:
         logger.error(f"AI fallback news error: {e}")
-        return [] the typhoon season risk in the Gulf of Thailand region."""
-
-    loop = asyncio.get_event_loop()
-    try:
-        raw = await loop.run_in_executor(None, lambda: _chat([
-            {"role": "system", "content": "You are a global safety intelligence analyst. Generate realistic safety intelligence items in JSON format only."},
-            {"role": "user", "content": prompt}
-        ], 2048))
-
-        results = _parse_json(raw)
-        logger.info(f"News monitor: {len(results)} items generated")
-        return results
-    except Exception as e:
-        logger.error(f"News monitor error: {e}")
         return []
 
 
