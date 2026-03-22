@@ -1,16 +1,17 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+# Set working directory to the backend
+WORKDIR /app/backend
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements and install dependencies
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy all source files
-COPY . .
+# Copy the entire project
+COPY . /app/
 
-# Expose port (Railway sets $PORT)
+# Expose port
 EXPOSE 8000
 
-# Start the FastAPI server from the backend directory
-CMD ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run uvicorn from the backend directory (bare imports work correctly)
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
