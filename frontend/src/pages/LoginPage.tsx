@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Shield, AlertTriangle, Eye, EyeOff, UserPlus, LogIn, MapPin } from 'lucide-react'
+import { Eye, EyeOff, UserPlus, LogIn, MapPin } from 'lucide-react'
 import { api } from '../api'
 import type { AuthUser } from '../types'
 
@@ -8,13 +8,12 @@ interface Props {
 }
 
 const DEMO_ACCOUNTS = [
-  { label: 'Admin — Angela Crispi', email: 'admin@hbs.edu', password: 'sentinel2026', role: 'admin' },
-  { label: 'Student — Priya Mehta (Bangkok)', email: 'priya.mehta@hbs.edu', password: 'hbs2026', role: 'student' },
-  { label: 'Student — James Okafor (Bangkok)', email: 'james.okafor@hbs.edu', password: 'hbs2026', role: 'student' },
-  { label: 'Student — Aisha Patel (London)', email: 'aisha.patel@hbs.edu', password: 'hbs2026', role: 'student' },
+  { label: 'Angela Crispi', role: 'Dean of Students — Admin', email: 'admin@hbs.edu', password: 'sentinel2026' },
+  { label: 'Priya Mehta', role: 'MBA \'26 — Bangkok (Affected)', email: 'priya.mehta@hbs.edu', password: 'hbs2026' },
+  { label: 'James Okafor', role: 'MBA \'26 — Bangkok (Affected)', email: 'james.okafor@hbs.edu', password: 'hbs2026' },
+  { label: 'Aisha Patel', role: 'MBA \'26 — London', email: 'aisha.patel@hbs.edu', password: 'hbs2026' },
 ]
 
-// Common city coordinates for quick selection
 const CITY_PRESETS = [
   { city: 'Boston, USA', lat: 42.3601, lng: -71.0589 },
   { city: 'New York, USA', lat: 40.7128, lng: -74.0060 },
@@ -26,10 +25,10 @@ const CITY_PRESETS = [
   { city: 'São Paulo, Brazil', lat: -23.5505, lng: -46.6333 },
 ]
 
+const HBS_CRIMSON = '#AC2134'
+
 export function LoginPage({ onLogin }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
-
-  // Login state
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -108,234 +107,280 @@ export function LoginPage({ onLogin }: Props) {
     setRegLng(preset.lng)
   }
 
-  return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
-      {/* Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-crimson-950/30 via-gray-950 to-gray-950" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-crimson-900/10 blur-3xl rounded-full" />
-      </div>
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: '#1e293b',
+    border: '1px solid #334155',
+    borderRadius: 6,
+    padding: '10px 14px',
+    color: '#f1f5f9',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.15s',
+  }
 
-      <div className="relative w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-crimson-700 rounded-2xl mb-4 shadow-lg shadow-crimson-900/50">
-            <Shield className="w-9 h-9 text-white" />
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    fontWeight: 500,
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#0f172a',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 16px',
+      fontFamily: 'Inter, system-ui, sans-serif',
+    }}>
+      {/* Subtle crimson glow at top */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: 300,
+        background: 'radial-gradient(ellipse at 50% -20%, rgba(172,33,52,0.15) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
+        {/* Wordmark */}
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          {/* HBS Shield-style icon */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 56, height: 56, marginBottom: 20,
+            background: HBS_CRIMSON,
+            borderRadius: 8,
+            boxShadow: `0 0 32px ${HBS_CRIMSON}44`,
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">HBS Sentinel</h1>
-          <p className="text-gray-400 mt-1 text-sm">Student Safety Intelligence Platform</p>
-          <div className="mt-2 inline-flex items-center gap-1.5 bg-crimson-900/30 border border-crimson-800/50 rounded-full px-3 py-1">
-            <div className="w-1.5 h-1.5 bg-crimson-400 rounded-full animate-pulse" />
-            <span className="text-crimson-300 text-xs font-medium">Live — Spring 2026</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontFamily: 'Georgia, serif', fontSize: 32, fontWeight: 400, color: '#f1f5f9', letterSpacing: '-0.5px' }}>HBS</span>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 28, fontWeight: 300, color: '#94a3b8', letterSpacing: '0.05em' }}>Sentinel</span>
+          </div>
+          <p style={{ fontSize: 14, color: '#6b7280', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 400 }}>
+            Student Safety Intelligence Platform
+          </p>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            marginTop: 12,
+            background: 'rgba(172,33,52,0.12)',
+            border: '1px solid rgba(172,33,52,0.3)',
+            borderRadius: 20, padding: '4px 12px',
+          }}>
+            <div style={{ width: 6, height: 6, background: HBS_CRIMSON, borderRadius: '50%', animation: 'pulse 2s infinite' }} />
+            <span style={{ fontSize: 11, color: '#e88a96', fontWeight: 500, letterSpacing: '0.06em' }}>LIVE — SPRING 2026</span>
           </div>
         </div>
 
         {/* Mode toggle */}
-        <div className="flex rounded-xl bg-gray-900 border border-gray-800 p-1 mb-4">
-          <button
-            onClick={() => { setMode('login'); setError('') }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-              mode === 'login'
-                ? 'bg-crimson-700 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <LogIn className="w-4 h-4" /> Sign In
-          </button>
-          <button
-            onClick={() => { setMode('register'); setError('') }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-              mode === 'register'
-                ? 'bg-crimson-700 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <UserPlus className="w-4 h-4" /> Create Account
-          </button>
+        <div style={{ display: 'flex', background: '#1e293b', borderRadius: 8, padding: 4, marginBottom: 20, border: '1px solid #334155' }}>
+          {(['login', 'register'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setError('') }}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '8px 0', borderRadius: 6, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
+                background: mode === m ? HBS_CRIMSON : 'transparent',
+                color: mode === m ? '#fff' : '#9ca3af',
+              }}
+            >
+              {m === 'login' ? <LogIn size={14} /> : <UserPlus size={14} />}
+              {m === 'login' ? 'Sign In' : 'Create Account'}
+            </button>
+          ))}
         </div>
 
         {/* Card */}
-        <div className="sentinel-card p-8 shadow-2xl">
-
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: 10,
+          padding: 32,
+          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+        }}>
           {/* ── LOGIN FORM ── */}
           {mode === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">HBS Email</label>
+                <label style={labelStyle}>HBS Email</label>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@hbs.edu"
-                  required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-crimson-600 focus:ring-1 focus:ring-crimson-600 transition-colors"
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@hbs.edu" required style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)}
+                  onBlur={e => (e.target.style.borderColor = '#334155')}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
-                <div className="relative">
+                <label style={labelStyle}>Password</label>
+                <div style={{ position: 'relative' }}>
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
+                    type={showPassword ? 'text' : 'password'} value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••••"
-                    required
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-crimson-600 focus:ring-1 focus:ring-crimson-600 transition-colors pr-10"
+                    placeholder="••••••••••" required
+                    style={{ ...inputStyle, paddingRight: 40 }}
+                    onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)}
+                    onBlur={e => (e.target.style.borderColor = '#334155')}
                   />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
               {error && (
-                <div className="flex items-center gap-2 bg-red-900/30 border border-red-800/50 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span className="text-red-300 text-sm">{error}</span>
+                <div style={{ background: 'rgba(172,33,52,0.12)', border: '1px solid rgba(172,33,52,0.3)', borderRadius: 6, padding: '10px 14px', color: '#e88a96', fontSize: 13 }}>
+                  {error}
                 </div>
               )}
-              <button type="submit" disabled={loading} className="w-full bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-center gap-2">
-                {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Signing in...</> : 'Sign In to Sentinel'}
+              <button type="submit" disabled={loading} style={{
+                background: HBS_CRIMSON, color: '#fff', border: 'none', borderRadius: 6,
+                padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'opacity 0.15s',
+              }}>
+                {loading ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Signing in...</> : 'Sign In to Sentinel'}
               </button>
             </form>
           )}
 
           {/* ── REGISTER FORM ── */}
           {mode === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <p className="text-xs text-gray-400 mb-2">Register as a new HBS student to receive crisis alerts and manage your safety profile.</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Full Name *</label>
-                  <input type="text" value={regName} onChange={e => setRegName(e.target.value)} placeholder="e.g. Alex Johnson" required
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600 focus:ring-1 focus:ring-crimson-600" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-400 mb-1">HBS Email *</label>
-                  <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="you@hbs.edu" required
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600 focus:ring-1 focus:ring-crimson-600" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Password *</label>
-                  <div className="relative">
-                    <input type={showRegPassword ? 'text' : 'password'} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="Min 6 characters" required
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600 focus:ring-1 focus:ring-crimson-600 pr-9" />
-                    <button type="button" onClick={() => setShowRegPassword(!showRegPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                      {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Program</label>
-                  <select value={regProgram} onChange={e => setRegProgram(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-crimson-600">
-                    <option>MBA</option>
-                    <option>MBA 2+2</option>
-                    <option>Executive MBA</option>
-                    <option>PhD</option>
-                    <option>HBS Online</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Class Year</label>
-                  <select value={regYear} onChange={e => setRegYear(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-crimson-600">
-                    <option>MBA 2026</option>
-                    <option>MBA 2027</option>
-                    <option>MBA 2028</option>
-                    <option>Executive MBA 2026</option>
-                    <option>PhD 2026</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Hometown</label>
-                  <input type="text" value={regHometown} onChange={e => setRegHometown(e.target.value)} placeholder="e.g. Mumbai, India"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Phone</label>
-                  <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="+1-617-555-0000"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600" />
+            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+                Register as a new HBS student to receive crisis alerts and manage your safety profile.
+              </p>
+              <div>
+                <label style={labelStyle}>Full Name *</label>
+                <input type="text" value={regName} onChange={e => setRegName(e.target.value)} placeholder="e.g. Alex Johnson" required style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+              </div>
+              <div>
+                <label style={labelStyle}>HBS Email *</label>
+                <input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="you@hbs.edu" required style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Password *</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showRegPassword ? 'text' : 'password'} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="Min 6 characters" required
+                    style={{ ...inputStyle, paddingRight: 40 }}
+                    onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+                  <button type="button" onClick={() => setShowRegPassword(!showRegPassword)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
+                    {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
-
-              {/* Current Location */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Program</label>
+                  <select value={regProgram} onChange={e => setRegProgram(e.target.value)}
+                    style={{ ...inputStyle, appearance: 'none' }}>
+                    <option>MBA</option><option>MBA 2+2</option><option>Executive MBA</option><option>PhD</option><option>HBS Online</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Class Year</label>
+                  <select value={regYear} onChange={e => setRegYear(e.target.value)}
+                    style={{ ...inputStyle, appearance: 'none' }}>
+                    <option>MBA 2025</option><option>MBA 2026</option><option>MBA 2027</option><option>Executive MBA 2026</option>
+                  </select>
+                </div>
+              </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> Current Location
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
+                <label style={labelStyle}>Hometown</label>
+                <input type="text" value={regHometown} onChange={e => setRegHometown(e.target.value)} placeholder="e.g. Mumbai, India" style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Phone</label>
+                <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)} placeholder="+1-617-555-0000" style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Current City *</label>
+                <input type="text" value={regCity} onChange={e => setRegCity(e.target.value)} placeholder="e.g. Boston, USA" required style={inputStyle}
+                  onFocus={e => (e.target.style.borderColor = HBS_CRIMSON)} onBlur={e => (e.target.style.borderColor = '#334155')} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                   {CITY_PRESETS.map(p => (
                     <button key={p.city} type="button" onClick={() => selectCity(p)}
-                      className={`text-xs px-2 py-1 rounded-md border transition-all ${
-                        regCity === p.city
-                          ? 'bg-crimson-700 border-crimson-600 text-white'
-                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
-                      }`}>
-                      {p.city}
+                      style={{
+                        background: regCity === p.city ? 'rgba(172,33,52,0.2)' : '#0f172a',
+                        border: `1px solid ${regCity === p.city ? HBS_CRIMSON : '#334155'}`,
+                        borderRadius: 4, padding: '3px 8px', fontSize: 11, color: regCity === p.city ? '#e88a96' : '#9ca3af',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                      <MapPin size={10} /> {p.city.split(',')[0]}
                     </button>
                   ))}
                 </div>
-                <input type="text" value={regCity} onChange={e => setRegCity(e.target.value)} placeholder="Or type your city"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-crimson-600" />
-                {regLat !== 0 && (
-                  <p className="text-xs text-gray-500 mt-1">📍 {regLat.toFixed(4)}, {regLng.toFixed(4)}</p>
-                )}
               </div>
-
               {error && (
-                <div className="flex items-center gap-2 bg-red-900/30 border border-red-800/50 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span className="text-red-300 text-sm">{error}</span>
+                <div style={{ background: 'rgba(172,33,52,0.12)', border: '1px solid rgba(172,33,52,0.3)', borderRadius: 6, padding: '10px 14px', color: '#e88a96', fontSize: 13 }}>
+                  {error}
                 </div>
               )}
-
-              <button type="submit" disabled={loading} className="w-full bg-crimson-700 hover:bg-crimson-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-colors duration-150 flex items-center justify-center gap-2">
-                {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating account...</> : <><UserPlus className="w-4 h-4" /> Create Student Account</>}
+              <button type="submit" disabled={loading} style={{
+                background: HBS_CRIMSON, color: '#fff', border: 'none', borderRadius: 6,
+                padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                {loading ? 'Creating account...' : 'Create Account'}
               </button>
             </form>
           )}
-
-          {/* Demo accounts (login mode only) */}
-          {mode === 'login' && (
-            <div className="mt-6 pt-6 border-t border-gray-800">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Demo Accounts</p>
-              <div className="space-y-2">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button key={acc.email} onClick={() => quickLogin(acc)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-gray-600 transition-all group">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm text-gray-200 font-medium">{acc.label}</span>
-                        <p className="text-xs text-gray-500 mt-0.5">{acc.email}</p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        acc.role === 'admin'
-                          ? 'bg-crimson-900/50 text-crimson-300 border border-crimson-800/50'
-                          : 'bg-blue-900/50 text-blue-300 border border-blue-800/50'
-                      }`}>{acc.role}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Register mode: link to sign in */}
-          {mode === 'register' && (
-            <p className="mt-4 text-center text-xs text-gray-500">
-              Already have an account?{' '}
-              <button onClick={() => { setMode('login'); setError('') }} className="text-crimson-400 hover:text-crimson-300 underline">
-                Sign in
-              </button>
-            </p>
-          )}
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
-          Harvard Business School · DSAIL 2026 · Confidential
+        {/* Demo accounts */}
+        <div style={{ marginTop: 28 }}>
+          <p style={{ fontSize: 11, color: '#4b5563', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+            Demo Accounts
+          </p>
+          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, overflow: 'hidden' }}>
+            {DEMO_ACCOUNTS.map((acc, i) => (
+              <button
+                key={acc.email}
+                onClick={() => quickLogin(acc)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', background: 'none', border: 'none',
+                  borderBottom: i < DEMO_ACCOUNTS.length - 1 ? '1px solid #334155' : 'none',
+                  cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#0f172a')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              >
+                <div>
+                  <div style={{ fontSize: 13, color: '#f1f5f9', fontWeight: 500 }}>{acc.label}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{acc.role}</div>
+                </div>
+                <span style={{ fontSize: 11, color: '#4b5563', fontFamily: 'monospace' }}>{acc.email}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p style={{ textAlign: 'center', fontSize: 11, color: '#374151', marginTop: 28, letterSpacing: '0.04em' }}>
+          Harvard Business School — Soldiers Field, Boston MA 02163
         </p>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
     </div>
   )
 }

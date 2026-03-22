@@ -1,12 +1,18 @@
+/**
+ * HBS Sentinel — Admin Dashboard
+ * v3.0 — Full HBS design refresh + Reports tab + map reset fix
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Shield, LogOut, Zap, RefreshCw, Users, AlertTriangle,
   CheckCircle, Globe, Bell, Newspaper, ChevronRight,
-  MapPin, Clock, X, Send, RotateCcw, ExternalLink
+  MapPin, Clock, X, Send, RotateCcw, ExternalLink, BarChart2
 } from 'lucide-react'
 import { WorldMap } from '../components/WorldMap'
 import { StatusBadge, SeverityBar } from '../components/StatusBadge'
 import { PipelineProgress } from '../components/PipelineProgress'
+import ReportsTab from '../components/ReportsTab'
 import { useWebSocket } from '../useWebSocket'
 import { api } from '../api'
 import type { AuthUser, Student, CrisisEvent, DeliveryLogEntry, NewsItem } from '../types'
@@ -17,7 +23,12 @@ interface Props {
   onLogout: () => void
 }
 
-type Tab = 'map' | 'students' | 'log' | 'news'
+type Tab = 'map' | 'students' | 'log' | 'news' | 'reports'
+
+const HBS_CRIMSON = '#AC2134'
+const AMBER = '#d97706'
+const GREEN = '#16a34a'
+const GRAY = '#6b7280'
 
 export function AdminDashboard({ user, onLogout }: Props) {
   const [students, setStudents] = useState<Student[]>([])
@@ -97,7 +108,7 @@ export function AdminDashboard({ user, onLogout }: Props) {
         setStudents(prev => prev.map(s =>
           s.id === data.student_id ? { ...s, ...data.student } : s
         ))
-        addNotification(`✓ ${data.student_name} marked themselves safe`)
+        addNotification(`✓ ${data.student_name} confirmed safe`)
         break
 
       case 'student_status_updated':
@@ -147,12 +158,17 @@ export function AdminDashboard({ user, onLogout }: Props) {
         break
 
       case 'demo_reset':
+        // Bug fix #2: use students from WS payload (new array ref forces WorldMap re-render)
         setCrisis(null)
         setPipelineStage('')
         setPipelineRunning(false)
         setDeliveryLog([])
-        api.getDashboard().then(d => setStudents(d.students || []))
-        addNotification('Demo reset complete')
+        if (data.students && data.students.length > 0) {
+          setStudents([...data.students])  // spread ensures new reference → WorldMap re-renders
+        } else {
+          api.getDashboard().then(d => setStudents([...d.students]))
+        }
+        addNotification('Demo reset complete — map redrawn')
         break
     }
   }, [])
@@ -213,99 +229,174 @@ export function AdminDashboard({ user, onLogout }: Props) {
   const safe = students.filter(s => s.risk_status === 'SAFE').length
   const unconfirmed = students.filter(s => s.risk_status === 'UNCONFIRMED').length
 
+  const tabs: { id: Tab; label: string; icon: any; badge?: number }[] = [
+    { id: 'map', label: 'World Map', icon: Globe },
+    { id: 'students', label: 'Students', icon: Users },
+    { id: 'log', label: 'Delivery Log', icon: Bell, badge: deliveryLog.filter(e => e.status === 'Delivered').length || undefined },
+    { id: 'news', label: 'News', icon: Newspaper, badge: news.filter(n => n.is_crisis).length || undefined },
+    { id: 'reports', label: 'Reports', icon: BarChart2 },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-crimson-700 rounded-lg flex items-center justify-center">
-            <Shield className="w-5 h-5 text-white" />
+    <div style={{ minHeight: '100vh', background: '#030712', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
+
+      {/* ── Top Navigation Bar ── */}
+      <header style={{
+        background: '#0f172a',
+        borderBottom: '1px solid #1e293b',
+        padding: '0 24px',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 32, height: 32, background: HBS_CRIMSON, borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Shield size={18} color="white" />
           </div>
-          <div>
-            <h1 className="font-bold text-white text-lg leading-none">HBS Sentinel</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Admin Dashboard</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 400, color: '#f1f5f9' }}>HBS</span>
+            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 300, color: '#94a3b8', letterSpacing: '0.05em' }}>Sentinel</span>
           </div>
           {crisis && (
-            <div className="ml-4 flex items-center gap-1.5 bg-red-900/30 border border-red-800/50 rounded-full px-3 py-1">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-red-300 text-xs font-semibold">ACTIVE CRISIS: {crisis.name}</span>
+            <div style={{
+              marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(172,33,52,0.15)', border: '1px solid rgba(172,33,52,0.4)',
+              borderRadius: 20, padding: '3px 10px',
+            }}>
+              <div style={{ width: 6, height: 6, background: HBS_CRIMSON, borderRadius: '50%', animation: 'pulse 2s infinite' }} />
+              <span style={{ color: '#e88a96', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em' }}>
+                ACTIVE CRISIS: {crisis.name.toUpperCase()}
+              </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Notifications */}
+        {/* Right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {notifications.length > 0 && (
-            <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-1.5 max-w-xs">
-              <Bell className="w-4 h-4 text-crimson-400 shrink-0" />
-              <span className="text-xs text-gray-300 truncate">{notifications[0]}</span>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: '#1e293b', borderRadius: 6, padding: '6px 12px',
+              maxWidth: 280,
+            }}>
+              <Bell size={13} color="#9ca3af" />
+              <span style={{ fontSize: 12, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {notifications[0]}
+              </span>
             </div>
           )}
-          <span className="text-sm text-gray-400">{user.name}</span>
-          <button onClick={onLogout} className="text-gray-500 hover:text-gray-300 transition-colors">
-            <LogOut className="w-4 h-4" />
+          <span style={{ fontSize: 13, color: '#6b7280' }}>{user.name}</span>
+          <button onClick={onLogout} style={{ background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <LogOut size={16} />
           </button>
         </div>
       </header>
 
-      {/* Stats Bar */}
-      <div className="bg-gray-900/50 border-b border-gray-800 px-6 py-3 flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-400">{students.length} Students Tracked</span>
+      {/* ── Status Headline ── */}
+      <div style={{
+        background: '#0f172a',
+        borderBottom: '1px solid #1e293b',
+        padding: '16px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        <div>
+          {crisis ? (
+            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 400, color: HBS_CRIMSON, margin: 0, lineHeight: 1 }}>
+              ⚠ Active Crisis — {affected + atRisk} Student{affected + atRisk !== 1 ? 's' : ''} Affected
+            </h1>
+          ) : (
+            <h1 style={{ fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: 400, color: '#94a3b8', margin: 0, lineHeight: 1 }}>
+              All Clear — All Students Safe
+            </h1>
+          )}
+          <p style={{ fontSize: 13, color: '#4b5563', margin: '6px 0 0 0' }}>
+            {user.title || 'Dean of Students'} · Harvard Business School
+          </p>
         </div>
-        <div className="h-4 w-px bg-gray-700" />
-        <StatPill label="Affected" value={affected} color="text-red-400" />
-        <StatPill label="At Risk" value={atRisk} color="text-amber-400" />
-        <StatPill label="Safe" value={safe} color="text-emerald-400" />
-        <StatPill label="Unconfirmed" value={unconfirmed} color="text-gray-400" />
-        <div className="ml-auto flex items-center gap-2">
+
+        {/* Stats */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <StatBlock label="Total" value={students.length} color="#f1f5f9" />
+          <StatBlock label="Affected" value={affected} color={affected > 0 ? HBS_CRIMSON : '#4b5563'} />
+          <StatBlock label="At Risk" value={atRisk} color={atRisk > 0 ? AMBER : '#4b5563'} />
+          <StatBlock label="Safe" value={safe} color={safe > 0 ? GREEN : '#4b5563'} />
+          <StatBlock label="Unconfirmed" value={unconfirmed} color={GRAY} />
           <button
             onClick={resetDemo}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: '1px solid #334155', borderRadius: 6,
+              padding: '6px 12px', color: '#6b7280', fontSize: 12, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.borderColor = '#475569' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6b7280'; e.currentTarget.style.borderColor = '#334155' }}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Demo
+            <RotateCcw size={12} /> Reset Demo
           </button>
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Map + Controls */}
-        <div className="flex-1 flex flex-col min-w-0">
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left: content area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+
           {/* Tab bar */}
-          <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-gray-800 bg-gray-950">
-            {(['map', 'students', 'log', 'news'] as Tab[]).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors capitalize ${
-                  activeTab === tab
-                    ? 'bg-gray-900 text-white border-t border-l border-r border-gray-700'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                {tab === 'map' && <Globe className="w-3.5 h-3.5 inline mr-1.5" />}
-                {tab === 'students' && <Users className="w-3.5 h-3.5 inline mr-1.5" />}
-                {tab === 'log' && <Bell className="w-3.5 h-3.5 inline mr-1.5" />}
-                {tab === 'news' && <Newspaper className="w-3.5 h-3.5 inline mr-1.5" />}
-                {tab === 'map' ? 'World Map' : tab === 'log' ? 'Delivery Log' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                {tab === 'log' && deliveryLog.length > 0 && (
-                  <span className="ml-1.5 bg-crimson-700 text-white text-xs rounded-full px-1.5 py-0.5">
-                    {deliveryLog.filter(e => e.status === 'Delivered').length}
-                  </span>
-                )}
-                {tab === 'news' && news.filter(n => n.is_crisis).length > 0 && (
-                  <span className="ml-1.5 bg-amber-600 text-white text-xs rounded-full px-1.5 py-0.5">
-                    {news.filter(n => n.is_crisis).length}
-                  </span>
-                )}
-              </button>
-            ))}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 0,
+            padding: '0 20px',
+            borderBottom: '1px solid #1e293b',
+            background: '#0f172a',
+            flexShrink: 0,
+          }}>
+            {tabs.map(tab => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '12px 16px',
+                    background: 'none', border: 'none',
+                    borderBottom: isActive ? `2px solid ${HBS_CRIMSON}` : '2px solid transparent',
+                    color: isActive ? '#f1f5f9' : '#6b7280',
+                    fontSize: 13, fontWeight: isActive ? 600 : 400,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    marginBottom: -1,
+                  }}
+                >
+                  <Icon size={14} />
+                  {tab.label}
+                  {tab.badge != null && tab.badge > 0 && (
+                    <span style={{
+                      background: tab.id === 'news' ? AMBER : HBS_CRIMSON,
+                      color: '#fff', fontSize: 10, borderRadius: 10,
+                      padding: '1px 6px', fontWeight: 700,
+                    }}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
 
-          <div className="flex-1 overflow-hidden bg-gray-900 p-4">
+          {/* Tab content */}
+          <div style={{ flex: 1, overflow: 'hidden', background: '#030712', padding: activeTab === 'reports' ? '24px 28px' : 16 }}>
+
             {activeTab === 'map' && (
               <WorldMap
                 students={students}
@@ -315,7 +406,7 @@ export function AdminDashboard({ user, onLogout }: Props) {
             )}
 
             {activeTab === 'students' && (
-              <div className="h-full overflow-y-auto space-y-2 pr-1">
+              <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {students.map(student => (
                   <StudentRow
                     key={student.id}
@@ -328,51 +419,55 @@ export function AdminDashboard({ user, onLogout }: Props) {
             )}
 
             {activeTab === 'log' && (
-              <div className="h-full overflow-y-auto space-y-2 pr-1">
+              <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {deliveryLog.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-600">
-                    <Bell className="w-12 h-12 mb-3 opacity-30" />
-                    <p className="text-sm">No alerts sent yet</p>
-                    <p className="text-xs mt-1">Trigger a crisis to see the delivery log</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#374151' }}>
+                    <Bell size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
+                    <p style={{ fontSize: 14, margin: 0 }}>No alerts sent yet</p>
+                    <p style={{ fontSize: 12, color: '#4b5563', margin: '4px 0 0 0' }}>Trigger a crisis to see the delivery log</p>
                   </div>
                 ) : (
-                  deliveryLog.map(entry => (
-                    <DeliveryRow key={entry.id} entry={entry} />
-                  ))
+                  deliveryLog.map(entry => <DeliveryRow key={entry.id} entry={entry} />)
                 )}
                 <div ref={logEndRef} />
               </div>
             )}
 
             {activeTab === 'news' && (
-              <div className="h-full overflow-y-auto space-y-2 pr-1">
-                <div className="flex items-center justify-between mb-3">
+              <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
                   <div>
-                    <p className="text-sm text-gray-400">Live global news feed monitored by Claude</p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="inline-flex items-center gap-1 text-xs bg-blue-900/30 border border-blue-800/40 text-blue-400 rounded-full px-2 py-0.5">
-                        <Globe className="w-3 h-3" /> GDELT Live Feed
+                    <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Live global news feed monitored by AI</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                        color: '#93c5fd', borderRadius: 20, padding: '2px 8px', fontSize: 11,
+                      }}>
+                        <Globe size={10} /> GDELT Live Feed
                       </span>
-                      <span className="text-xs text-gray-600">· Real headlines, AI-classified</span>
+                      <span style={{ fontSize: 11, color: '#374151' }}>· Real headlines, AI-classified</span>
                     </div>
                   </div>
                   <button
                     onClick={scanNews}
                     disabled={scanningNews}
-                    className="sentinel-btn-secondary text-xs py-1.5"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      background: '#1e293b', border: '1px solid #334155', borderRadius: 6,
+                      padding: '7px 14px', color: '#cbd5e1', fontSize: 12, cursor: scanningNews ? 'not-allowed' : 'pointer',
+                      opacity: scanningNews ? 0.6 : 1,
+                    }}
                   >
-                    {scanningNews ? (
-                      <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Scanning...</>
-                    ) : (
-                      <><RefreshCw className="w-3.5 h-3.5" /> Scan News</>
-                    )}
+                    <RefreshCw size={13} style={{ animation: scanningNews ? 'spin 1s linear infinite' : 'none' }} />
+                    {scanningNews ? 'Scanning...' : 'Scan News'}
                   </button>
                 </div>
                 {news.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-48 text-gray-600">
-                    <Newspaper className="w-12 h-12 mb-3 opacity-30" />
-                    <p className="text-sm">No news items yet</p>
-                    <p className="text-xs mt-1">Click "Scan News" to monitor live global news</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, color: '#374151' }}>
+                    <Newspaper size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
+                    <p style={{ fontSize: 14, margin: 0 }}>No news items yet</p>
+                    <p style={{ fontSize: 12, color: '#4b5563', margin: '4px 0 0 0' }}>Click "Scan News" to monitor live global news</p>
                   </div>
                 ) : (
                   news.map(item => <NewsRow key={item.id} item={item} onTrigger={() => {
@@ -383,165 +478,204 @@ export function AdminDashboard({ user, onLogout }: Props) {
                 )}
               </div>
             )}
+
+            {activeTab === 'reports' && <ReportsTab />}
           </div>
         </div>
 
-        {/* Right sidebar */}
-        <div className="w-80 border-l border-gray-800 bg-gray-950 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Crisis Controls */}
-            <div className="sentinel-card p-4">
-              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-crimson-400" />
-                Crisis Controls
-              </h3>
+        {/* ── Right sidebar ── */}
+        {activeTab !== 'reports' && (
+          <div style={{
+            width: 300, borderLeft: '1px solid #1e293b', background: '#0a0f1a',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
+          }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Pipeline progress */}
-              {(pipelineRunning || pipelineStage) && (
-                <div className="mb-3">
-                  <PipelineProgress
-                    currentStage={pipelineStage}
-                    message={pipelineMessage}
-                    error={pipelineError}
+              {/* Crisis Controls */}
+              <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 20 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Zap size={13} color={HBS_CRIMSON} /> Crisis Controls
+                </h3>
+
+                {(pipelineRunning || pipelineStage) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <PipelineProgress currentStage={pipelineStage} message={pipelineMessage} error={pipelineError} />
+                  </div>
+                )}
+
+                {!crisis && !pipelineRunning && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button
+                      onClick={triggerBangkok}
+                      style={{
+                        width: '100%', background: HBS_CRIMSON, color: '#fff', border: 'none',
+                        borderRadius: 8, padding: '14px 0', fontSize: 14, fontWeight: 600,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        boxShadow: `0 4px 16px rgba(172,33,52,0.3)`,
+                        transition: 'opacity 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                    >
+                      <AlertTriangle size={18} />
+                      Trigger Bangkok Typhoon
+                    </button>
+
+                    {showCustomForm ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea
+                          value={customCrisis}
+                          onChange={e => setCustomCrisis(e.target.value)}
+                          placeholder="Describe the crisis event..."
+                          rows={3}
+                          style={{
+                            width: '100%', background: '#0f172a', border: '1px solid #334155',
+                            borderRadius: 6, padding: '10px 12px', color: '#f1f5f9', fontSize: 13,
+                            resize: 'none', outline: 'none', boxSizing: 'border-box',
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={triggerCustom} style={{
+                            flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: 6,
+                            padding: '8px 0', color: '#f1f5f9', fontSize: 13, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}>
+                            <Send size={13} /> Trigger
+                          </button>
+                          <button onClick={() => setShowCustomForm(false)} style={{
+                            background: '#1e293b', border: '1px solid #334155', borderRadius: 6,
+                            padding: '8px 12px', color: '#6b7280', fontSize: 13, cursor: 'pointer',
+                          }}>
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowCustomForm(true)}
+                        style={{
+                          width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+                          padding: '10px 0', color: '#9ca3af', fontSize: 13, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#f1f5f9')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}
+                      >
+                        <Globe size={14} /> Custom Crisis
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {crisis && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ background: 'rgba(172,33,52,0.1)', border: '1px solid rgba(172,33,52,0.3)', borderRadius: 8, padding: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <div style={{ width: 8, height: 8, background: HBS_CRIMSON, borderRadius: '50%', animation: 'pulse 2s infinite' }} />
+                        <span style={{ color: '#e88a96', fontWeight: 600, fontSize: 14 }}>{crisis.name}</span>
+                      </div>
+                      <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 8px 0' }}>{crisis.affected_area}</p>
+                      <SeverityBar severity={crisis.severity} />
+                      <p style={{ fontSize: 11, color: '#6b7280', margin: '8px 0 0 0' }}>
+                        Confidence: {Math.round(crisis.confidence * 100)}% · Radius: {crisis.radius_km}km
+                      </p>
+                      {crisis.source_headline && (
+                        <p style={{ fontSize: 11, color: '#6b7280', margin: '4px 0 0 0', fontStyle: 'italic' }}>
+                          "{crisis.source_headline}"
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={resolveActiveCrisis}
+                      style={{
+                        width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+                        padding: '10px 0', color: '#9ca3af', fontSize: 13, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                    >
+                      <CheckCircle size={14} /> Resolve Crisis
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Student detail */}
+              {selectedStudent && (
+                <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+                      Student Detail
+                    </h3>
+                    <button onClick={() => setSelectedStudent(null)} style={{ background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <StudentDetail
+                    student={selectedStudent}
+                    onStatusChange={(s) => updateStudentStatus(selectedStudent.id, s)}
                   />
                 </div>
               )}
 
-              {/* Bangkok button */}
-              {!crisis && !pipelineRunning && (
-                <button
-                  onClick={triggerBangkok}
-                  className="w-full bg-crimson-700 hover:bg-crimson-600 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mb-2 shadow-lg shadow-crimson-900/30"
-                >
-                  <AlertTriangle className="w-5 h-5" />
-                  Trigger Bangkok Typhoon
-                </button>
-              )}
-
-              {/* Custom crisis */}
-              {!crisis && !pipelineRunning && (
-                <>
-                  {showCustomForm ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={customCrisis}
-                        onChange={e => setCustomCrisis(e.target.value)}
-                        placeholder="Describe the crisis event..."
-                        rows={3}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-crimson-600 resize-none"
-                      />
-                      <div className="flex gap-2">
-                        <button onClick={triggerCustom} className="flex-1 sentinel-btn-primary text-sm py-2 justify-center">
-                          <Send className="w-3.5 h-3.5" />
-                          Trigger
+              {/* Quick student list */}
+              {!selectedStudent && (
+                <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 20 }}>
+                  <h3 style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Users size={13} /> Students
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {students.map(s => {
+                      const dotColor = s.risk_status === 'AFFECTED' ? HBS_CRIMSON
+                        : s.risk_status === 'AT_RISK' ? AMBER
+                        : s.risk_status === 'SAFE' ? GREEN
+                        : GRAY
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSelectedStudent(s)}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 8px', background: 'none', border: 'none', borderRadius: 6,
+                            cursor: 'pointer', transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#0f172a')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <div style={{
+                              width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0,
+                              animation: s.risk_status === 'AFFECTED' ? 'pulse 2s infinite' : 'none',
+                            }} />
+                            <span style={{ fontSize: 13, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                          </div>
+                          <ChevronRight size={12} color="#4b5563" />
                         </button>
-                        <button onClick={() => setShowCustomForm(false)} className="sentinel-btn-secondary text-sm py-2">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowCustomForm(true)}
-                      className="w-full sentinel-btn-secondary text-sm py-2 justify-center"
-                    >
-                      <Globe className="w-4 h-4" />
-                      Custom Crisis
-                    </button>
-                  )}
-                </>
-              )}
-
-              {/* Active crisis info */}
-              {crisis && (
-                <div className="space-y-3">
-                  <div className="bg-red-950/30 border border-red-900/50 rounded-xl p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-red-300 font-semibold text-sm">{crisis.name}</span>
-                    </div>
-                    <p className="text-xs text-gray-400 mb-2">{crisis.affected_area}</p>
-                    <SeverityBar severity={crisis.severity} />
-                    <p className="text-xs text-gray-500 mt-2">
-                      Confidence: {Math.round(crisis.confidence * 100)}% · Radius: {crisis.radius_km}km
-                    </p>
-                    {crisis.source_headline && (
-                      <p className="text-xs text-gray-500 mt-1 italic">"{crisis.source_headline}"</p>
-                    )}
+                      )
+                    })}
                   </div>
-                  <button
-                    onClick={resolveActiveCrisis}
-                    className="w-full sentinel-btn-secondary text-sm py-2 justify-center"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Resolve Crisis
-                  </button>
                 </div>
               )}
             </div>
-
-            {/* Student detail */}
-            {selectedStudent && (
-              <div className="sentinel-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Student Detail</h3>
-                  <button onClick={() => setSelectedStudent(null)} className="text-gray-500 hover:text-gray-300">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <StudentDetail
-                  student={selectedStudent}
-                  onStatusChange={(s) => updateStudentStatus(selectedStudent.id, s)}
-                />
-              </div>
-            )}
-
-            {/* Quick student list */}
-            {!selectedStudent && (
-              <div className="sentinel-card p-4">
-                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-gray-400" />
-                  Students
-                </h3>
-                <div className="space-y-1.5">
-                  {students.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedStudent(s)}
-                      className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${
-                          s.risk_status === 'AFFECTED' ? 'bg-red-500 animate-pulse' :
-                          s.risk_status === 'AT_RISK' ? 'bg-amber-500' :
-                          s.risk_status === 'SAFE' ? 'bg-emerald-500' :
-                          'bg-gray-500'
-                        }`} />
-                        <span className="text-sm text-gray-300 truncate">{s.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-xs text-gray-500 hidden group-hover:block">
-                          {s.current_city.split(',')[0]}
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+      `}</style>
     </div>
   )
 }
 
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatBlock({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className={`text-lg font-bold ${color}`}>{value}</span>
-      <span className="text-xs text-gray-500">{label}</span>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: 40, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#4b5563', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
     </div>
   )
 }
@@ -551,22 +685,34 @@ function StudentRow({ student, onSelect, onStatusChange }: {
   onSelect: () => void
   onStatusChange: (s: string) => void
 }) {
+  const dotColor = student.risk_status === 'AFFECTED' ? HBS_CRIMSON
+    : student.risk_status === 'AT_RISK' ? AMBER
+    : student.risk_status === 'SAFE' ? GREEN
+    : GRAY
+
   return (
-    <div className="sentinel-card p-3 flex items-center gap-3 hover:border-gray-700 transition-colors cursor-pointer" onClick={onSelect}>
-      <div className={`w-3 h-3 rounded-full shrink-0 ${
-        student.risk_status === 'AFFECTED' ? 'bg-red-500 animate-pulse' :
-        student.risk_status === 'AT_RISK' ? 'bg-amber-500' :
-        student.risk_status === 'SAFE' ? 'bg-emerald-500' :
-        'bg-gray-500'
-      }`} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-white text-sm">{student.name}</span>
-          <span className="text-xs text-gray-500">{student.year}</span>
+    <div
+      onClick={onSelect}
+      style={{
+        background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+        cursor: 'pointer', transition: 'border-color 0.15s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#475569')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#334155')}
+    >
+      <div style={{
+        width: 12, height: 12, borderRadius: '50%', background: dotColor, flexShrink: 0,
+        animation: student.risk_status === 'AFFECTED' ? 'pulse 2s infinite' : 'none',
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 500, color: '#f1f5f9', fontSize: 14 }}>{student.name}</span>
+          <span style={{ fontSize: 11, color: '#4b5563' }}>{student.year}</span>
         </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <MapPin className="w-3 h-3 text-gray-500" />
-          <span className="text-xs text-gray-400">{student.current_city}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+          <MapPin size={11} color="#4b5563" />
+          <span style={{ fontSize: 12, color: '#6b7280' }}>{student.current_city}</span>
         </div>
       </div>
       <StatusBadge status={student.risk_status} />
@@ -579,31 +725,35 @@ function StudentDetail({ student, onStatusChange }: {
   onStatusChange: (s: string) => void
 }) {
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <p className="font-semibold text-white">{student.name}</p>
-        <p className="text-xs text-gray-400">{student.year} · {student.program}</p>
-        <p className="text-xs text-gray-500 mt-1">📍 {student.current_city}</p>
+        <p style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 15, margin: 0 }}>{student.name}</p>
+        <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0' }}>{student.year} · {student.program}</p>
+        <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <MapPin size={11} /> {student.current_city}
+        </p>
       </div>
       <StatusBadge status={student.risk_status} size="md" />
       {student.alert_message && (
-        <div className="bg-gray-800 rounded-lg p-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Claude Alert</p>
-          <p className="text-xs text-gray-300 leading-relaxed">{student.alert_message}</p>
+        <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, borderLeft: `3px solid ${HBS_CRIMSON}` }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px 0' }}>AI Alert</p>
+          <p style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.5, margin: 0 }}>{student.alert_message}</p>
         </div>
       )}
       <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Manual Override</p>
-        <div className="grid grid-cols-2 gap-1.5">
+        <p style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px 0' }}>Manual Override</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {['AFFECTED', 'AT_RISK', 'SAFE', 'UNCONFIRMED'].map(s => (
             <button
               key={s}
               onClick={() => onStatusChange(s)}
-              className={`text-xs py-1.5 rounded-lg border transition-colors ${
-                student.risk_status === s
-                  ? 'bg-gray-700 border-gray-600 text-white font-semibold'
-                  : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600'
-              }`}
+              style={{
+                fontSize: 11, padding: '7px 0', borderRadius: 6, cursor: 'pointer', transition: 'all 0.15s',
+                background: student.risk_status === s ? '#334155' : '#0f172a',
+                border: `1px solid ${student.risk_status === s ? '#475569' : '#1e293b'}`,
+                color: student.risk_status === s ? '#f1f5f9' : '#6b7280',
+                fontWeight: student.risk_status === s ? 600 : 400,
+              }}
             >
               {s === 'AT_RISK' ? 'At Risk' : s.charAt(0) + s.slice(1).toLowerCase()}
             </button>
@@ -611,8 +761,8 @@ function StudentDetail({ student, onStatusChange }: {
         </div>
       </div>
       {student.safe_confirmed_at && (
-        <div className="flex items-center gap-2 text-emerald-400 text-xs">
-          <CheckCircle className="w-3.5 h-3.5" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: GREEN, fontSize: 12 }}>
+          <CheckCircle size={13} />
           Safe confirmed {formatDistanceToNow(new Date(student.safe_confirmed_at), { addSuffix: true })}
         </div>
       )}
@@ -623,27 +773,34 @@ function StudentDetail({ student, onStatusChange }: {
 function DeliveryRow({ entry }: { entry: DeliveryLogEntry }) {
   const isDelivered = entry.status === 'Delivered'
   const isSafe = entry.status === 'No Alert — Safe'
+  const dotColor = isDelivered ? GREEN : isSafe ? GRAY : AMBER
+
   return (
-    <div className="sentinel-card p-3 flex items-start gap-3 slide-in">
-      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-        isDelivered ? 'bg-emerald-500' : isSafe ? 'bg-gray-500' : 'bg-amber-500'
-      }`} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-white text-sm">{entry.student_name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            isDelivered ? 'bg-emerald-900/40 text-emerald-400' :
-            isSafe ? 'bg-gray-800 text-gray-500' :
-            'bg-amber-900/40 text-amber-400'
-          }`}>
+    <div style={{
+      background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+      padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+    }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, marginTop: 5, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 500, color: '#f1f5f9', fontSize: 13 }}>{entry.student_name}</span>
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 500,
+            background: isDelivered ? 'rgba(22,163,74,0.15)' : isSafe ? '#1e293b' : 'rgba(217,119,6,0.15)',
+            color: isDelivered ? GREEN : isSafe ? GRAY : AMBER,
+          }}>
             {entry.status}
           </span>
-          <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">{entry.channel}</span>
+          <span style={{ fontSize: 11, background: '#0f172a', color: '#6b7280', padding: '2px 8px', borderRadius: 20 }}>
+            {entry.channel}
+          </span>
         </div>
-        <p className="text-xs text-gray-500 mt-1 truncate">{entry.message_preview}</p>
-        <div className="flex items-center gap-1 mt-1">
-          <Clock className="w-3 h-3 text-gray-600" />
-          <span className="text-xs text-gray-600">
+        <p style={{ fontSize: 12, color: '#4b5563', margin: '4px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {entry.message_preview}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+          <Clock size={11} color="#374151" />
+          <span style={{ fontSize: 11, color: '#374151' }}>
             {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
           </span>
         </div>
@@ -654,24 +811,29 @@ function DeliveryRow({ entry }: { entry: DeliveryLogEntry }) {
 
 function NewsRow({ item, onTrigger }: { item: NewsItem; onTrigger: () => void }) {
   return (
-    <div className={`sentinel-card p-3 ${item.is_crisis ? 'border-amber-800/50 bg-amber-950/10' : ''}`}>
-      <div className="flex items-start gap-2">
-        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-          item.is_crisis ? 'bg-amber-500 animate-pulse' : 'bg-gray-600'
-        }`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-200 leading-snug">{item.headline}</p>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-xs text-gray-500">{item.source}</span>
-            <span className="text-xs text-gray-600">·</span>
-            <span className="text-xs text-gray-500">{item.location_mentioned}</span>
-            {(item as any).data_source === 'GDELT Live Feed' && (
-              <span className="text-xs bg-blue-900/30 text-blue-400 border border-blue-800/40 px-1.5 py-0.5 rounded font-medium">
-                GDELT
-              </span>
-            )}
+    <div style={{
+      background: item.is_crisis ? 'rgba(217,119,6,0.05)' : '#1e293b',
+      border: `1px solid ${item.is_crisis ? 'rgba(217,119,6,0.3)' : '#334155'}`,
+      borderRadius: 8, padding: '12px 16px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: item.is_crisis ? AMBER : '#374151',
+          marginTop: 5, flexShrink: 0,
+          animation: item.is_crisis ? 'pulse 2s infinite' : 'none',
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.4 }}>{item.headline}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: '#4b5563' }}>{item.source}</span>
+            <span style={{ fontSize: 11, color: '#374151' }}>·</span>
+            <span style={{ fontSize: 11, color: '#4b5563' }}>{item.location_mentioned}</span>
             {item.is_crisis && (
-              <span className="text-xs bg-amber-900/40 text-amber-400 border border-amber-800/50 px-2 py-0.5 rounded-full font-medium">
+              <span style={{
+                fontSize: 10, background: 'rgba(217,119,6,0.15)', color: AMBER,
+                border: '1px solid rgba(217,119,6,0.3)', borderRadius: 20, padding: '2px 8px', fontWeight: 600,
+              }}>
                 Crisis Flagged
               </span>
             )}
@@ -679,16 +841,18 @@ function NewsRow({ item, onTrigger }: { item: NewsItem; onTrigger: () => void })
           {item.is_crisis && (
             <button
               onClick={onTrigger}
-              className="mt-2 text-xs text-crimson-400 hover:text-crimson-300 flex items-center gap-1"
+              style={{
+                marginTop: 8, background: 'none', border: 'none', color: '#e88a96',
+                fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0,
+              }}
             >
-              <Zap className="w-3 h-3" />
-              Trigger pipeline for this event
+              <Zap size={12} /> Trigger pipeline for this event
             </button>
           )}
         </div>
         {item.url && (
-          <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-400 shrink-0">
-            <ExternalLink className="w-3.5 h-3.5" />
+          <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: '#374151', flexShrink: 0 }}>
+            <ExternalLink size={13} />
           </a>
         )}
       </div>

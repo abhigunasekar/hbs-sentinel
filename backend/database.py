@@ -1,6 +1,7 @@
 """
 HBS Sentinel — In-Memory State Store
 Manages all application state: students, crises, alerts, delivery log, news feed.
+Version: v3.0 — Added crisis_history seeding, news deduplication, reports data
 """
 
 from typing import Dict, List, Optional
@@ -9,6 +10,98 @@ from models import (
     MOCK_STUDENTS, MOCK_ADMIN, RiskStatus
 )
 import copy
+from datetime import datetime, timezone
+
+
+# ── Seeded crisis history records ─────────────────────────────────────────────
+
+SEEDED_CRISIS_HISTORY = [
+    {
+        "id": "hist-001",
+        "name": "Typhoon Haikui",
+        "crisis_type": "Typhoon",
+        "severity": 5,
+        "location": "Bangkok, Thailand",
+        "center_lat": 13.7563,
+        "center_lng": 100.5018,
+        "triggered_at": "2026-02-14T09:23:00Z",
+        "students_affected": 4,
+        "avg_response_time_minutes": 8,
+        "fastest_response_minutes": 4,
+        "status": "Resolved",
+        "affected_students": ["Priya Mehta", "James Okafor", "Sofia Reyes", "Kenji Tanaka"],
+        "confirmed_safe": 3,
+        "source_headline": "BREAKING: Category 4 Typhoon Haikui makes landfall near Bangkok",
+    },
+    {
+        "id": "hist-002",
+        "name": "Sao Paulo Flash Flooding",
+        "crisis_type": "Flood",
+        "severity": 3,
+        "location": "Sao Paulo, Brazil",
+        "center_lat": -23.5505,
+        "center_lng": -46.6333,
+        "triggered_at": "2026-01-28T14:05:00Z",
+        "students_affected": 1,
+        "avg_response_time_minutes": 22,
+        "fastest_response_minutes": 22,
+        "status": "Resolved",
+        "affected_students": ["Marcus Webb"],
+        "confirmed_safe": 1,
+        "source_headline": "Severe flash flooding shuts down Paulista Avenue and central districts",
+    },
+    {
+        "id": "hist-003",
+        "name": "London Transit Strike",
+        "crisis_type": "Civil Unrest",
+        "severity": 2,
+        "location": "London, United Kingdom",
+        "center_lat": 51.5074,
+        "center_lng": -0.1278,
+        "triggered_at": "2026-01-15T07:45:00Z",
+        "students_affected": 2,
+        "avg_response_time_minutes": 45,
+        "fastest_response_minutes": 31,
+        "status": "Resolved",
+        "affected_students": ["Aisha Patel", "Claire Dubois"],
+        "confirmed_safe": 2,
+        "source_headline": "London Underground strike enters third day; Heathrow links disrupted",
+    },
+    {
+        "id": "hist-004",
+        "name": "Dubai Sandstorm",
+        "crisis_type": "Other",
+        "severity": 2,
+        "location": "Dubai, UAE",
+        "center_lat": 25.2048,
+        "center_lng": 55.2708,
+        "triggered_at": "2026-03-02T11:30:00Z",
+        "students_affected": 1,
+        "avg_response_time_minutes": 12,
+        "fastest_response_minutes": 12,
+        "status": "Resolved",
+        "affected_students": ["Yusuf Al-Rashid"],
+        "confirmed_safe": 1,
+        "source_headline": "Severe sandstorm grounds flights at Dubai International Airport",
+    },
+    {
+        "id": "hist-005",
+        "name": "Seoul Earthquake Warning",
+        "crisis_type": "Earthquake",
+        "severity": 4,
+        "location": "Seoul, South Korea",
+        "center_lat": 37.5665,
+        "center_lng": 126.9780,
+        "triggered_at": "2026-03-10T03:17:00Z",
+        "students_affected": 1,
+        "avg_response_time_minutes": 6,
+        "fastest_response_minutes": 6,
+        "status": "Resolved",
+        "affected_students": ["Daniel Park"],
+        "confirmed_safe": 1,
+        "source_headline": "5.8 magnitude earthquake strikes near Seoul; aftershocks expected",
+    },
+]
 
 
 class Database:
@@ -22,6 +115,8 @@ class Database:
         self.news_feed: List[NewsItem] = []
         self.active_crisis_id: Optional[str] = None
         self.pipeline_running: bool = False
+        # Crisis history (seeded + live)
+        self.crisis_history: List[dict] = copy.deepcopy(SEEDED_CRISIS_HISTORY)
 
     # ── Auth ──────────────────────────────────────────────────────────────────
 
@@ -72,7 +167,6 @@ class Database:
         from models import TravelPlan
         if student_id in self.students:
             tp = TravelPlan(**travel_plan)
-            # Replace or add travel plan for same destination
             plans = self.students[student_id].travel_plans
             plans = [p for p in plans if p.destination != tp.destination]
             plans.append(tp)
@@ -89,11 +183,9 @@ class Database:
             self.students[student_id].risk_status = status
 
     def confirm_student_safe(self, student_id: str) -> bool:
-        from datetime import datetime, timezone
         if student_id in self.students:
             self.students[student_id].risk_status = RiskStatus.SAFE
             self.students[student_id].safe_confirmed_at = datetime.now(timezone.utc).isoformat()
-            # Update alert status
             for alert in self.alerts.values():
                 if alert.student_id == student_id:
                     alert.status = "ACKNOWLEDGED"
@@ -131,23 +223,180 @@ class Database:
             self.crises[crisis_id].is_active = False
         if self.active_crisis_id == crisis_id:
             self.active_crisis_id = None
-        # Reset student statuses
         for student in self.students.values():
             student.risk_status = RiskStatus.UNCONFIRMED
             student.alert_message = None
             student.alert_id = None
 
+    # ── Crisis History ────────────────────────────────────────────────────────
+
+    def get_crisis_history(self) -> List[dict]:
+        """Return seeded + live crisis history, most recent first."""
+        live = []
+        for c in self.crises.values():
+            affected_count = len(c.affected_students) + len(c.at_risk_students)
+            response_times = []
+            for alert in self.alerts.values():
+                if alert.crisis_id == c.id and alert.acknowledged_at:
+                    try:
+                        sent = datetime.fromisoformat(alert.created_at.replace("Z", "+00:00"))
+                        ack = datetime.fromisoformat(alert.acknowledged_at.replace("Z", "+00:00"))
+                        diff_minutes = (ack - sent).total_seconds() / 60
+                        response_times.append(diff_minutes)
+                    except Exception:
+                        pass
+            avg_rt = round(sum(response_times) / len(response_times), 1) if response_times else None
+            fastest = round(min(response_times), 1) if response_times else None
+            live.append({
+                "id": c.id,
+                "name": c.name,
+                "crisis_type": c.crisis_type.value if hasattr(c.crisis_type, "value") else c.crisis_type,
+                "severity": c.severity,
+                "location": c.affected_area,
+                "center_lat": c.center_lat,
+                "center_lng": c.center_lng,
+                "triggered_at": c.triggered_at,
+                "students_affected": affected_count,
+                "avg_response_time_minutes": avg_rt,
+                "fastest_response_minutes": fastest,
+                "status": "Active" if c.is_active else "Resolved",
+                "affected_students": [
+                    self.students[sid].name for sid in c.affected_students if sid in self.students
+                ],
+                "confirmed_safe": sum(
+                    1 for sid in (c.affected_students + c.at_risk_students)
+                    if sid in self.students and self.students[sid].risk_status == RiskStatus.SAFE
+                ),
+                "source_headline": c.source_headline,
+            })
+        live_names = {e["name"] for e in live}
+        seeded = [e for e in self.crisis_history if e["name"] not in live_names]
+        combined = live + seeded
+        combined.sort(key=lambda x: x.get("triggered_at", ""), reverse=True)
+        return combined
+
+    def get_reports_summary(self) -> dict:
+        """Aggregate stats for the Reports tab."""
+        history = self.get_crisis_history()
+        total = len(history)
+        response_times = [
+            h["avg_response_time_minutes"]
+            for h in history
+            if h.get("avg_response_time_minutes") is not None
+        ]
+        avg_rt = round(sum(response_times) / len(response_times), 1) if response_times else 0
+        fastest = round(min(response_times), 1) if response_times else 0
+
+        region_map = {
+            "Southeast Asia": ["Bangkok", "Thailand", "Vietnam", "Indonesia", "Singapore", "Malaysia", "Philippines"],
+            "Europe": ["London", "Berlin", "Paris", "Munich", "Lyon", "Rome", "Madrid", "Amsterdam", "United Kingdom", "Germany", "France"],
+            "South America": ["Sao Paulo", "Brazil", "Buenos Aires", "Lima", "Bogota"],
+            "Middle East": ["Dubai", "UAE", "Riyadh", "Saudi", "Doha", "Qatar", "Abu Dhabi"],
+            "East Asia": ["Seoul", "South Korea", "Tokyo", "Japan", "Beijing", "Shanghai", "China"],
+            "North America": ["New York", "Boston", "Atlanta", "Chicago", "Los Angeles", "USA", "Canada"],
+            "Africa": ["Lagos", "Nigeria", "Nairobi", "Kenya", "Cairo", "Egypt"],
+            "South Asia": ["Mumbai", "India", "Delhi", "Karachi", "Pakistan"],
+        }
+        region_counts: Dict[str, int] = {r: 0 for r in region_map}
+        for h in history:
+            loc = h.get("location", "")
+            for region, keywords in region_map.items():
+                if any(kw.lower() in loc.lower() for kw in keywords):
+                    region_counts[region] += 1
+                    break
+
+        student_concentration: Dict[str, int] = {r: 0 for r in region_map}
+        for s in self.students.values():
+            city = s.current_city
+            for region, keywords in region_map.items():
+                if any(kw.lower() in city.lower() for kw in keywords):
+                    student_concentration[region] += 1
+                    break
+
+        all_response_times = []
+        for alert in self.alerts.values():
+            if alert.acknowledged_at:
+                try:
+                    sent = datetime.fromisoformat(alert.created_at.replace("Z", "+00:00"))
+                    ack = datetime.fromisoformat(alert.acknowledged_at.replace("Z", "+00:00"))
+                    diff_minutes = (ack - sent).total_seconds() / 60
+                    all_response_times.append(diff_minutes)
+                except Exception:
+                    pass
+        for h in self.crisis_history:
+            rt = h.get("avg_response_time_minutes")
+            if rt is not None:
+                all_response_times.append(rt)
+
+        buckets = {
+            "Under 5 min": sum(1 for t in all_response_times if t < 5),
+            "5-15 min": sum(1 for t in all_response_times if 5 <= t < 15),
+            "15-30 min": sum(1 for t in all_response_times if 15 <= t < 30),
+            "30-60 min": sum(1 for t in all_response_times if 30 <= t < 60),
+            "Over 60 min": sum(1 for t in all_response_times if t >= 60),
+        }
+
+        total_affected = sum(h.get("students_affected", 0) for h in history)
+        total_confirmed = sum(h.get("confirmed_safe", 0) for h in history)
+        no_response = max(0, total_affected - total_confirmed)
+
+        student_stats = []
+        for s in self.students.values():
+            student_alerts = [a for a in self.alerts.values() if a.student_id == s.id]
+            resp_times = []
+            for a in student_alerts:
+                if a.acknowledged_at:
+                    try:
+                        sent = datetime.fromisoformat(a.created_at.replace("Z", "+00:00"))
+                        ack = datetime.fromisoformat(a.acknowledged_at.replace("Z", "+00:00"))
+                        resp_times.append((ack - sent).total_seconds() / 60)
+                    except Exception:
+                        pass
+            crises_involved = len(student_alerts)
+            for h in self.crisis_history:
+                if s.name in h.get("affected_students", []):
+                    crises_involved += 1
+                    rt = h.get("avg_response_time_minutes")
+                    if rt is not None:
+                        resp_times.append(rt)
+            avg_student_rt = round(sum(resp_times) / len(resp_times), 1) if resp_times else None
+            student_stats.append({
+                "id": s.id,
+                "name": s.name,
+                "current_city": s.current_city,
+                "crises_involved": crises_involved,
+                "avg_response_time": avg_student_rt,
+                "risk_status": s.risk_status.value if hasattr(s.risk_status, "value") else s.risk_status,
+            })
+        student_stats.sort(key=lambda x: x["crises_involved"], reverse=True)
+
+        return {
+            "summary": {
+                "total_crises": total,
+                "avg_response_time": avg_rt,
+                "fastest_response": fastest,
+            },
+            "crisis_history": history,
+            "region_counts": region_counts,
+            "student_concentration": student_concentration,
+            "response_buckets": buckets,
+            "response_rate": {
+                "confirmed_safe": total_confirmed,
+                "no_response": no_response,
+                "total": total_affected,
+            },
+            "student_stats": student_stats,
+        }
+
     # ── Alerts ────────────────────────────────────────────────────────────────
 
     def add_alert(self, alert: Alert):
         self.alerts[alert.id] = alert
-        # Attach to student
         if alert.student_id in self.students:
             self.students[alert.student_id].alert_message = alert.message
             self.students[alert.student_id].alert_id = alert.id
 
     def mark_alert_read(self, alert_id: str):
-        from datetime import datetime, timezone
         if alert_id in self.alerts:
             self.alerts[alert_id].status = "READ"
             self.alerts[alert_id].read_at = datetime.now(timezone.utc).isoformat()
@@ -166,6 +415,13 @@ class Database:
     # ── News Feed ─────────────────────────────────────────────────────────────
 
     def add_news_item(self, item: NewsItem):
+        # Deduplicate by URL and headline (bug fix #1)
+        existing_urls = {n.url for n in self.news_feed if n.url}
+        existing_headlines = {n.headline.lower().strip() for n in self.news_feed}
+        if item.url and item.url in existing_urls:
+            return
+        if item.headline.lower().strip() in existing_headlines:
+            return
         self.news_feed.insert(0, item)
         if len(self.news_feed) > 50:
             self.news_feed = self.news_feed[:50]
@@ -173,7 +429,7 @@ class Database:
     def get_news_feed(self) -> List[dict]:
         return [self._news_to_dict(n) for n in self.news_feed]
 
-    # ── Reset ─────────────────────────────────────────────────────────────────
+    # ── Registration ──────────────────────────────────────────────────────────
 
     def register_student(self, name: str, email: str, password: str, year: str,
                           program: str, hometown: str, phone: str,
@@ -181,14 +437,12 @@ class Database:
         """Register a new student account and return the user dict."""
         from models import Student, RiskStatus
         import uuid as _uuid
-        # Check email not already taken
         if email == self.admin.email:
             return None
         for s in self.students.values():
             if s.email == email:
                 return None
         new_id = f"s{str(len(self.students) + 1).zfill(3)}"
-        # Ensure unique ID
         while new_id in self.students:
             new_id = f"s{str(_uuid.uuid4())[:6]}"
         student = Student(
@@ -209,6 +463,8 @@ class Database:
         self.students[new_id] = student
         return self._student_to_dict(student)
 
+    # ── Reset ─────────────────────────────────────────────────────────────────
+
     def reset_demo(self):
         """Reset all state for a fresh demo run."""
         self.students = {s.id: copy.deepcopy(s) for s in MOCK_STUDENTS}
@@ -217,7 +473,7 @@ class Database:
         self.delivery_log = []
         self.active_crisis_id = None
         self.pipeline_running = False
-        # Keep news feed
+        # Keep news feed and seeded crisis history
 
     # ── Serializers ───────────────────────────────────────────────────────────
 

@@ -271,6 +271,13 @@ async def resolve_crisis(crisis_id: str):
     })
     return {"success": True}
 
+# ─── Reports ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/reports")
+async def get_reports():
+    """Aggregate data for the Reports tab."""
+    return db.get_reports_summary()
+
 # ─── Delivery Log ─────────────────────────────────────────────────────────────
 
 @app.get("/api/delivery-log")
@@ -306,7 +313,13 @@ async def get_dashboard():
 @app.post("/api/admin/reset")
 async def reset_demo():
     db.reset_demo()
-    await ws_manager.broadcast_to_admins("demo_reset", {"message": "Demo reset complete"})
+    # Bug fix #2: include fresh student data so the map redraws without a page refresh
+    fresh_students = db.get_all_students()
+    await ws_manager.broadcast_to_admins("demo_reset", {
+        "message": "Demo reset complete",
+        "students": fresh_students,
+        "active_crisis": None,
+    })
     await ws_manager.broadcast_to_all_students("demo_reset", {"message": "System reset"})
     return {"success": True}
 

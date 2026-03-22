@@ -7,11 +7,19 @@ interface Props {
   onStudentClick?: (student: Student) => void
 }
 
+// HBS design spec colors
 const STATUS_COLORS: Record<string, string> = {
-  AFFECTED: '#ef4444',
-  AT_RISK: '#f59e0b',
-  SAFE: '#10b981',
-  UNCONFIRMED: '#6b7280',
+  AFFECTED: '#AC2134',   // HBS Crimson — danger signal
+  AT_RISK: '#d97706',    // Amber
+  SAFE: '#16a34a',       // Green
+  UNCONFIRMED: '#6b7280', // Gray
+}
+
+const STATUS_BORDER: Record<string, string> = {
+  AFFECTED: '#fff',
+  AT_RISK: '#fff',
+  SAFE: '#fff',
+  UNCONFIRMED: '#9ca3af',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -31,10 +39,8 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
     if (mapInstanceRef.current) return
     if (!mapRef.current) return
 
-    // Dynamic import of Leaflet to avoid SSR issues
     const L = (window as any).L
     if (!L) {
-      // Load Leaflet dynamically
       const script = document.createElement('script')
       script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
       script.onload = () => initMap()
@@ -52,7 +58,7 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
         attributionControl: false,
       })
 
-      // Dark satellite-style tile layer
+      // CartoDB dark satellite tile layer
       L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         {
@@ -62,7 +68,6 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
         }
       ).addTo(map)
 
-      // Attribution in corner
       L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map)
 
       mapInstanceRef.current = map
@@ -86,41 +91,39 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
       crisisLayerRef.current = null
     }
 
-    // Add crisis zone circle
+    // Crisis zone circle — HBS Crimson at 30% opacity
     if (crisis) {
       const circle = L.circle([crisis.center_lat, crisis.center_lng], {
         radius: crisis.radius_km * 1000,
-        color: '#ef4444',
-        fillColor: '#ef4444',
-        fillOpacity: 0.08,
+        color: '#AC2134',
+        fillColor: '#AC2134',
+        fillOpacity: 0.15,
         weight: 2,
-        dashArray: '8, 6',
         className: 'crisis-zone-circle',
       }).addTo(map)
 
-      // Crisis center marker
       const crisisIcon = L.divIcon({
         html: `<div style="
-          width: 32px; height: 32px;
-          background: rgba(239,68,68,0.2);
-          border: 2px solid #ef4444;
+          width: 36px; height: 36px;
+          background: rgba(172,33,52,0.25);
+          border: 2px solid #AC2134;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          animation: pulse 2s infinite;
+          animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
         ">
-          <div style="width: 10px; height: 10px; background: #ef4444; border-radius: 50%;"></div>
+          <div style="width: 12px; height: 12px; background: #AC2134; border-radius: 50%;"></div>
         </div>`,
         className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
       })
       const crisisMarker = L.marker([crisis.center_lat, crisis.center_lng], { icon: crisisIcon })
         .addTo(map)
         .bindPopup(`
           <div style="min-width: 220px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-              <div style="width:10px;height:10px;background:#ef4444;border-radius:50%;animation:pulse 1s infinite;"></div>
-              <strong style="color:#ef4444; font-size:14px;">${crisis.name}</strong>
+              <div style="width:10px;height:10px;background:#AC2134;border-radius:50%;"></div>
+              <strong style="color:#AC2134; font-size:14px;">${crisis.name}</strong>
             </div>
             <div style="color:#94a3b8; font-size:12px; margin-bottom:4px;">${crisis.crisis_type} · Severity ${crisis.severity}/10</div>
             <div style="color:#cbd5e1; font-size:12px;">${crisis.affected_area}</div>
@@ -131,7 +134,7 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
       crisisLayerRef.current = circle
     }
 
-    // Add travel plan destination pins (secondary markers)
+    // Travel plan destination pins — blue diamond, 30% larger (18px)
     students.forEach(student => {
       if (!student.travel_plans || student.travel_plans.length === 0) return
       student.travel_plans.forEach((tp: any) => {
@@ -139,30 +142,30 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
         const travelIcon = L.divIcon({
           html: `<div style="
             position: relative;
-            width: 14px; height: 14px;
+            width: 18px; height: 18px;
           ">
             <div style="
               width: 100%; height: 100%;
-              background: #a855f7;
+              background: #3b82f6;
               border: 2px solid white;
               border-radius: 3px;
               transform: rotate(45deg);
-              box-shadow: 0 0 6px #a855f788;
+              box-shadow: 0 0 8px #3b82f688;
             "></div>
           </div>`,
           className: '',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
         })
         const travelMarker = L.marker([tp.destination_lat, tp.destination_lng], { icon: travelIcon })
           .addTo(map)
           .bindPopup(`
             <div style="min-width: 180px;">
               <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-                <div style="width:10px;height:10px;background:#a855f7;border-radius:2px;transform:rotate(45deg);"></div>
+                <div style="width:10px;height:10px;background:#3b82f6;border-radius:2px;transform:rotate(45deg);"></div>
                 <strong style="color:#f1f5f9; font-size:13px;">Planned Travel</strong>
               </div>
-              <div style="color:#c4b5fd; font-size:12px; font-weight:600; margin-bottom:4px;">✈️ ${tp.destination}</div>
+              <div style="color:#93c5fd; font-size:12px; font-weight:600; margin-bottom:4px;">✈️ ${tp.destination}</div>
               <div style="color:#94a3b8; font-size:11px; margin-bottom:2px;">Student: ${student.name}</div>
               <div style="color:#94a3b8; font-size:11px;">Departs: ${tp.departure_date}</div>
               <div style="color:#94a3b8; font-size:11px;">Returns: ${tp.return_date}</div>
@@ -171,47 +174,45 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
           `)
         markersRef.current.push(travelMarker)
 
-        // Draw a dashed line from current location to travel destination
         if (student.current_lat && student.current_lng) {
           const line = L.polyline(
             [[student.current_lat, student.current_lng], [tp.destination_lat, tp.destination_lng]],
-            { color: '#a855f7', weight: 1.5, dashArray: '4, 6', opacity: 0.5 }
+            { color: '#3b82f6', weight: 1.5, dashArray: '4, 6', opacity: 0.5 }
           ).addTo(map)
           markersRef.current.push(line)
         }
       })
     })
 
-    // Add student markers
+    // Student markers — design spec colors
     students.forEach(student => {
       const color = STATUS_COLORS[student.risk_status] || '#6b7280'
+      const border = STATUS_BORDER[student.risk_status] || '#9ca3af'
       const label = STATUS_LABELS[student.risk_status] || 'Unknown'
       const isAffected = student.risk_status === 'AFFECTED'
+      const isSafe = student.risk_status === 'SAFE'
+      const size = isAffected ? 22 : 16
 
       const icon = L.divIcon({
-        html: `<div style="
-          position: relative;
-          width: ${isAffected ? '20px' : '16px'};
-          height: ${isAffected ? '20px' : '16px'};
-        ">
+        html: `<div style="position: relative; width: ${size}px; height: ${size}px;">
           ${isAffected ? `<div style="
-            position: absolute; inset: -4px;
-            background: ${color}33;
+            position: absolute; inset: -5px;
+            background: rgba(172,33,52,0.25);
             border-radius: 50%;
             animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
           "></div>` : ''}
           <div style="
             width: 100%; height: 100%;
             background: ${color};
-            border: 2px solid white;
+            border: 2px solid ${border};
             border-radius: 50%;
-            box-shadow: 0 0 8px ${color}88;
+            box-shadow: 0 0 8px ${color}66;
             position: relative;
           "></div>
         </div>`,
         className: '',
-        iconSize: [isAffected ? 20 : 16, isAffected ? 20 : 16],
-        iconAnchor: [isAffected ? 10 : 8, isAffected ? 10 : 8],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
       })
 
       const marker = L.marker([student.current_lat, student.current_lng], { icon })
@@ -252,27 +253,37 @@ export function WorldMap({ students, crisis, onStudentClick }: Props) {
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full rounded-xl overflow-hidden" />
-      
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-xl p-3 z-[1000]">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Student Status</p>
-        <div className="space-y-1.5">
+
+      {/* Legend — clean floating card */}
+      <div style={{
+        position: 'absolute', bottom: 16, left: 16,
+        background: 'rgba(15,23,42,0.92)',
+        border: '1px solid #334155',
+        borderRadius: 8,
+        padding: '12px 16px',
+        zIndex: 1000,
+        backdropFilter: 'blur(8px)',
+      }}>
+        <p style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10, margin: '0 0 10px 0' }}>
+          Student Status
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {Object.entries(STATUS_COLORS).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full border border-white/30" style={{ background: color }} />
-              <span className="text-xs text-gray-300">{STATUS_LABELS[status]}</span>
+            <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, border: '2px solid rgba(255,255,255,0.3)', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>{STATUS_LABELS[status]}</span>
             </div>
           ))}
           {crisis && (
-            <div className="flex items-center gap-2 pt-1 border-t border-gray-700 mt-1">
-              <div className="w-3 h-3 rounded-full border-2 border-red-500 border-dashed" />
-              <span className="text-xs text-gray-300">Crisis Zone</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid #334155', marginTop: 2 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #AC2134', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>Crisis Zone</span>
             </div>
           )}
           {students.some(s => s.travel_plans && s.travel_plans.length > 0) && (
-            <div className="flex items-center gap-2 pt-1 border-t border-gray-700 mt-1">
-              <div className="w-3 h-3 border border-white/30 rotate-45" style={{ background: '#a855f7' }} />
-              <span className="text-xs text-gray-300">Planned Travel</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid #334155', marginTop: 2 }}>
+              <div style={{ width: 10, height: 10, background: '#3b82f6', border: '2px solid rgba(255,255,255,0.3)', transform: 'rotate(45deg)', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#cbd5e1' }}>Planned Travel</span>
             </div>
           )}
         </div>
