@@ -1,6 +1,7 @@
 """
 HBS Sentinel — FastAPI Backend
 Main application entry point with all API routes and WebSocket endpoints.
+Version: v2.0 — 2026-03-22 — Added /api/auth/register, GDELT news, travel plan pins
 """
 
 import os
