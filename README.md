@@ -3,6 +3,8 @@
 > **Real-Time Student Safety Intelligence for Harvard Business School**  
 > DSAIL Final Project · Harvard Business School · Spring 2026
 
+**Live URL:** https://hbs-sentinel-v2-production.up.railway.app
+
 HBS Sentinel is an AI-powered student safety platform that closes a critical visibility gap: when a crisis strikes anywhere in the world, HBS currently has no way to identify which of its 1,800 students are at risk in under 5 minutes.
 
 ---
