@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: hbs-sentinel
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: OPENAI_API_KEY
+        sync: false
