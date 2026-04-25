@@ -3,7 +3,9 @@
 > **Real-Time Student Safety Intelligence for Harvard Business School**  
 > DSAIL Final Project · Harvard Business School · Spring 2026
 
-**Live URL:** https://hbs-sentinel-v2-production.up.railway.app
+**Live URL:** https://8000-ih6uj7chhtqgum9xxp4m8-06952070.us2.manus.computer
+
+> **Note:** A permanent hosted version can be deployed via the included `Dockerfile` or `render.yaml` on any Docker-compatible platform.
 
 HBS Sentinel is an AI-powered student safety platform that closes a critical visibility gap: when a crisis strikes anywhere in the world, HBS currently has no way to identify which of its 1,800 students are at risk in under 5 minutes.
 
@@ -33,9 +35,9 @@ HBS Sentinel is an AI-powered student safety platform that closes a critical vis
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 + TypeScript + TailwindCSS + Leaflet.js |
+| Frontend | React 18 + TypeScript + TailwindCSS + Leaflet.js + Recharts |
 | Backend | Python 3.11 + FastAPI + WebSockets |
-| AI Engine | Claude API (claude-sonnet-4-5) via Anthropic |
+| AI Engine | OpenAI GPT-4.1 (via OpenAI API) |
 | Real-time | WebSockets (native FastAPI) |
 | Map | Leaflet.js + CartoDB Dark tiles |
 | State | In-memory (demo) |
@@ -47,13 +49,13 @@ HBS Sentinel is an AI-powered student safety platform that closes a critical vis
 When a crisis is triggered, three sequential AI stages fire:
 
 ### Stage 1 — Crisis Detector
-Claude receives a crisis description and returns structured JSON: event type, severity (1–10), center coordinates, affected radius, and confidence score.
+GPT-4.1 receives a crisis description and returns structured JSON: event type, severity (1–10), center coordinates, affected radius, and confidence score.
 
 ### Stage 2 — Risk Scorer
-Claude receives the crisis data plus the full student roster (with distances pre-computed) and assigns each student a risk tier: `AFFECTED`, `AT_RISK`, or `SAFE`, with a one-sentence rationale.
+GPT-4.1 receives the crisis data plus the full student roster (with distances pre-computed) and assigns each student a risk tier: `AFFECTED`, `AT_RISK`, or `SAFE`, with a one-sentence rationale.
 
 ### Stage 3 — Alert Composer
-For each affected/at-risk student, Claude composes a **personalized alert message** — not a template. It uses the student's name, location, bio, and risk rationale to write a message that feels human and provides actionable guidance.
+For each affected/at-risk student, GPT-4.1 composes a **personalized alert message** — not a template. It uses the student's name, location, bio, and risk rationale to write a message that feels human and provides actionable guidance.
 
 ---
 
@@ -102,17 +104,17 @@ Open http://localhost:8000
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | admin@hbs.edu | sentinel2026 |
-| Student (Bangkok) | priya.mehta@hbs.edu | hbs2026 |
-| Student (Bangkok) | james.okafor@hbs.edu | hbs2026 |
-| Student (Bangkok) | sofia.reyes@hbs.edu | hbs2026 |
-| Student (Bangkok) | kenji.tanaka@hbs.edu | hbs2026 |
-| Student (London) | aisha.patel@hbs.edu | hbs2026 |
-| Student (São Paulo) | marcus.webb@hbs.edu | hbs2026 |
-| Student (Berlin) | lena.fischer@hbs.edu | hbs2026 |
-| Student (Dubai) | yusuf.alrashid@hbs.edu | hbs2026 |
-| Student (Paris) | claire.dubois@hbs.edu | hbs2026 |
-| Student (Seoul) | daniel.park@hbs.edu | hbs2026 |
+| Admin (Angela Crispi) | admin@hbs.edu | sentinel2026 |
+| Student — Bangkok (Affected) | priya.mehta@hbs.edu | sentinel2026 |
+| Student — Bangkok (Affected) | james.okafor@hbs.edu | sentinel2026 |
+| Student — Bangkok (Affected) | sofia.reyes@hbs.edu | sentinel2026 |
+| Student — Bangkok (Affected) | kenji.tanaka@hbs.edu | sentinel2026 |
+| Student — London (Safe) | aisha.patel@hbs.edu | sentinel2026 |
+| Student — São Paulo | marcus.webb@hbs.edu | sentinel2026 |
+| Student — Berlin | lena.fischer@hbs.edu | sentinel2026 |
+| Student — Dubai | yusuf.alrashid@hbs.edu | sentinel2026 |
+| Student — Paris | claire.dubois@hbs.edu | sentinel2026 |
+| Student — Seoul | daniel.park@hbs.edu | sentinel2026 |
 
 ---
 
@@ -141,7 +143,7 @@ hbs-sentinel/
 │   ├── main.py              # FastAPI app, all routes, WebSocket endpoints
 │   ├── ai_pipeline.py       # 3-stage Claude AI pipeline
 │   ├── models.py            # Data models + mock student data
-│   ├── database.py          # In-memory state store
+│   ├── database.py          # In-memory state store + crisis history seeding
 │   └── websocket_manager.py # WebSocket connection manager
 ├── frontend/
 │   ├── src/
@@ -151,9 +153,10 @@ hbs-sentinel/
 │   │   │   ├── AdminDashboard.tsx  # Admin workflow
 │   │   │   └── StudentPortal.tsx   # Student workflow
 │   │   ├── components/
-│   │   │   ├── WorldMap.tsx        # Leaflet map
+│   │   │   ├── WorldMap.tsx         # Leaflet map with travel pins
+│   │   │   ├── ReportsTab.tsx       # Crisis history + Recharts analytics
 │   │   │   ├── PipelineProgress.tsx # AI stage tracker
-│   │   │   └── StatusBadge.tsx     # Risk status badges
+│   │   │   └── StatusBadge.tsx      # Risk status badges
 │   │   ├── api.ts            # REST API client
 │   │   ├── useWebSocket.ts   # WebSocket hook
 │   │   └── types.ts          # TypeScript types
@@ -165,18 +168,20 @@ hbs-sentinel/
 
 ---
 
-## Key Features
+## Key Features (v3.0)
 
-- **Real-time world map** with dark/satellite tiles and color-coded student pins
-- **AI-powered crisis detection** — classifies events by type, severity, and geography
-- **Personalized alerts** — Claude writes individual messages per student, not templates
-- **WebSocket updates** — both admin and student views update live without refresh
-- **Two distinct workflows** — admin dashboard and student portal feel like different products
-- **Live news monitoring** — Claude scans global news for crisis events
+- **Real-time world map** with dark tiles and color-coded student pins (travel mode indicators)
+- **AI-powered crisis detection** — classifies events by type, severity (1–10), and affected radius
+- **Personalized alerts** — GPT-4.1 writes individual messages per student, not templates
+- **WebSocket updates** — admin and student views update live without page refresh
+- **Two distinct workflows** — Admin dashboard and Student portal feel like separate products
+- **Reports tab** — Crisis history log, Student Response Analytics (Recharts), Regional Risk Map
+- **Live news monitoring** — scans global news for crisis events with deduplication
 - **One-tap safe confirmation** — students mark themselves safe; admins see it instantly
 - **Manual override** — admins can manually update any student's risk status
+- **Map reset fix** — map redraws immediately after demo reset without page refresh
 
 ---
 
-*HBS Sentinel · DSAIL Written Project · Harvard Business School 2026*  
+*HBS Sentinel · DSAIL Final Project · Harvard Business School · Spring 2026*  
 *Classification: Confidential — Academic Use Only*
